@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd frontend && npm run build",
+  "startCommand": "cd frontend && npm start",
+  "envVars": {
+    "NEXT_PUBLIC_API_BASE_URL": {
+      "description": "Backend API URL (set this to your backend QuikDB URL)",
+      "example": "https://startupd-api-xyz.quikdb.io"
+    }
+  }
+}
