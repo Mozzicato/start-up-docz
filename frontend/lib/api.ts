@@ -53,6 +53,10 @@ export function getProjectExportUrl(projectId: number): string {
   return `${API_BASE}/api/v1/projects/${projectId}/package.md`;
 }
 
+export function getProjectPdfUrl(projectId: number): string {
+  return `${API_BASE}/api/v1/projects/${projectId}/package.pdf`;
+}
+
 export async function createStartupReport(
   payload: StartupIdeaRequest
 ): Promise<StartupReportResponse> {

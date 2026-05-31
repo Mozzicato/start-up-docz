@@ -1,6 +1,7 @@
 import os
+import re
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
@@ -13,7 +14,7 @@ from app.schemas import (
     StartupReportResponse,
 )
 from app.services.report_generation import generate_startup_report_with_fallback
-from app.services.package_export import build_markdown_package
+from app.services.package_export import build_markdown_package, build_pdf_package
 
 app = FastAPI(title="StartupDocs API", version="0.1.0")
 
@@ -108,3 +109,23 @@ def export_startup_project_markdown(project_id: int) -> str:
 
         report = StartupReportResponse.model_validate(project.report_payload)
         return build_markdown_package(report)
+
+
+@app.get("/api/v1/projects/{project_id}/package.pdf")
+def export_startup_project_pdf(project_id: int) -> Response:
+    with get_session() as session:
+        project = get_project_by_id(session, project_id)
+
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        report = StartupReportResponse.model_validate(project.report_payload)
+        pdf_bytes = build_pdf_package(report)
+        safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", report.startup_name).strip("-") or "startup"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_name}-startup-package.pdf"'
+            },
+        )

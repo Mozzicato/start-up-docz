@@ -5,6 +5,7 @@ import {
   createStartupProject,
   getStartupProject,
   getProjectExportUrl,
+  getProjectPdfUrl,
   listStartupProjects,
   StartupProjectSummary,
   StartupReportResponse
@@ -231,14 +232,24 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-3xl">Generated Output</h2>
               {activeProjectId ? (
-                <a
-                  href={getProjectExportUrl(activeProjectId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg border border-[#cdbfa9] px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted hover:bg-[#f4ead9]"
-                >
-                  Download .md
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={getProjectPdfUrl(activeProjectId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-accentDark"
+                  >
+                    Download PDF
+                  </a>
+                  <a
+                    href={getProjectExportUrl(activeProjectId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-[#cdbfa9] px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted hover:bg-[#f4ead9]"
+                  >
+                    .md
+                  </a>
+                </div>
               ) : null}
             </div>
 
