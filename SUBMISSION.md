@@ -88,16 +88,22 @@ commands are entered manually in the QuikDB "Configuration" step.
 2. In **Configuration**, enter:
    - **Build Command:** `cd backend && pip install -r requirements.txt`
    - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. **Environment Variables** (all optional — set the ones you have):
+3. **Environment Variables** — add these exact keys. Copy the four API-key
+   *values* from your local `.env` file:
    ```
-   STARTUPDOCS_CORS_ORIGINS=*          # tighten to the frontend URL after Step 2
-   OPENROUTER_API_KEY=<your key>
-   GROQ_API_KEY=<your key>
-   GEMINI_API_KEY=<your key>
-   MISTRAL_API_KEY=<your key>
-   STARTUPDOCS_PROVIDER_ORDER=openrouter,groq,gemini,mistral
-   # DATABASE_URL=postgresql://...     # optional; defaults to SQLite
+   STARTUPDOCS_CORS_ORIGINS=*
+   GEMINI_API_KEY=<paste value from your .env>
+   OPENROUTER_API_KEY=<paste value from your .env>
+   GROQ_API_KEY=<paste value from your .env>
+   MISTRAL_API_KEY=<paste value from your .env>
    ```
+   - `STARTUPDOCS_CORS_ORIGINS=*` → type a literal `*`. (You can't know the
+     frontend URL yet; `*` allows any origin. Tighten it in Step 3 if you want.)
+   - **Do NOT add `DATABASE_URL`** — leave it out and the app uses SQLite
+     automatically. Only set it if you have your own Postgres server.
+   - The four API keys are **optional**. If you skip them, the app still works
+     using its built-in fallback generator — it just won't call a real LLM.
+   - You don't need `STARTUPDOCS_PROVIDER_ORDER` either; the default order is fine.
 4. **Deploy**, wait until live, then **copy the backend URL**
    (e.g. `https://startupdocs-api-xyz.quikdb.io`). Verify `…/health` returns
    `{"status":"ok"}`.
