@@ -72,77 +72,60 @@ are required** — without them the app uses the deterministic fallback generato
 
 ---
 
-## QuikDB Deployment
+## QuikDB Deployment (single combined container)
 
-StartupDocs is a **monorepo with two services** (backend + frontend). You deploy
-**two separate QuikDB deployments from the same repo/branch**
-(`Mozzicato/start-up-docz`, `main`). Deploy the **backend first**, because the
-frontend needs the backend's URL at build time.
+QuikDB builds an app by detecting the stack at the **repo root**. Because this is
+a monorepo (`frontend/` + `backend/`), the root has no single detectable stack —
+so the project ships a **root `Dockerfile`** that builds *both* services into one
+image. The Next.js frontend is the public service and proxies `/api/*` to the
+FastAPI backend on an internal port, so there is **one deployment, one URL, and
+no CORS to configure**.
 
-`quikdb.json` (repo root) auto-fills the **frontend** commands. The backend
-commands are entered manually in the QuikDB "Configuration" step.
-
-### Step 1 — Deploy the Backend (API)
+### Deploy
 
 1. **Create Deployment** → select repo `Mozzicato/start-up-docz`, branch `main`.
-2. In **Configuration**, enter:
-   - **Build Command:** `cd backend && pip install -r requirements.txt`
-   - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. **Environment Variables** — add these exact keys. Copy the four API-key
-   *values* from your local `.env` file:
+2. QuikDB detects the root `Dockerfile` and builds it. If the form asks for
+   commands:
+   - **Build Command:** leave empty (the `Dockerfile` builds everything).
+   - **Start Command:** `./start.sh` (this is also the Dockerfile's default).
+3. **Environment Variables** — all **optional**. Add any LLM keys you have
+   (copy the values from your local `.env`):
    ```
-   STARTUPDOCS_CORS_ORIGINS=*
    GEMINI_API_KEY=<paste value from your .env>
    OPENROUTER_API_KEY=<paste value from your .env>
    GROQ_API_KEY=<paste value from your .env>
    MISTRAL_API_KEY=<paste value from your .env>
    ```
-   - `STARTUPDOCS_CORS_ORIGINS=*` → type a literal `*`. (You can't know the
-     frontend URL yet; `*` allows any origin. Tighten it in Step 3 if you want.)
-   - **Do NOT add `DATABASE_URL`** — leave it out and the app uses SQLite
-     automatically. Only set it if you have your own Postgres server.
-   - The four API keys are **optional**. If you skip them, the app still works
-     using its built-in fallback generator — it just won't call a real LLM.
-   - You don't need `STARTUPDOCS_PROVIDER_ORDER` either; the default order is fine.
-4. **Deploy**, wait until live, then **copy the backend URL**
-   (e.g. `https://startupdocs-api-xyz.quikdb.io`). Verify `…/health` returns
-   `{"status":"ok"}`.
-
-### Step 2 — Deploy the Frontend
-
-1. **Create Deployment** → same repo `Mozzicato/start-up-docz`, branch `main`.
-2. **Configuration** is auto-detected from `quikdb.json`:
-   - **Build Command:** `cd frontend && npm install && npm run build`
-   - **Start Command:** `cd frontend && npx next start -p ${PORT:-3000}`
-3. **Environment Variables** — set **before deploying** (Next.js inlines
-   `NEXT_PUBLIC_*` at build time):
-   ```
-   NEXT_PUBLIC_API_BASE_URL=https://<backend-url-from-step-1>
-   ```
-4. **Deploy**, wait until live, then **copy the frontend URL**
-   (e.g. `https://startupdocs-xyz.quikdb.io`).
-
-### Step 3 — Lock down CORS (recommended)
-
-Go back to the **backend** deployment, change
-`STARTUPDOCS_CORS_ORIGINS` from `*` to your frontend URL
-(`https://<frontend-url>`), and redeploy. This restricts the API to your
-frontend instead of allowing any origin.
+   - You do **not** set `NEXT_PUBLIC_API_BASE_URL` — the frontend calls the
+     backend on the same origin via `/api`.
+   - You do **not** set `STARTUPDOCS_CORS_ORIGINS` or `DATABASE_URL`.
+   - With no keys, the app still works using its built-in deterministic
+     generator (it just won't call a real LLM).
+4. **Deploy**, wait until live, open the URL.
 
 ### Verification
 
-- Open the frontend URL → fill the intake form → **Generate**.
+- Open the deployment URL → fill the intake form → **Generate**.
 - A report renders (LLM output if keys are set, otherwise the fallback package).
 - Export downloads a `.md` file.
+- `…/api/v1/projects` and `…/health` (proxied) respond with JSON.
 
 ### Troubleshooting
 
 | Symptom | Fix |
 |--------|-----|
-| Frontend can't reach API / CORS error | Backend `STARTUPDOCS_CORS_ORIGINS` must include the frontend URL (or be `*`). |
-| Frontend calls `localhost:8000` | `NEXT_PUBLIC_API_BASE_URL` was not set **before** the frontend build; set it and rebuild. |
-| API 502 right after deploy | Backend still starting — wait and retry. |
-| Reports look generic/templated | No valid API key reached a provider, so the deterministic fallback was used. Add a working key. |
+| `unsupported app type: unknown` | QuikDB didn't pick up the root `Dockerfile`. Make sure the deployment branch is `main` and the `Dockerfile` is at the repo root (it is). |
+| API calls 502 right after deploy | Backend still starting inside the container — wait a few seconds and retry. |
+| Reports look generic/templated | No valid API key reached a provider, so the deterministic fallback was used. Add a working key and redeploy. |
+
+### Alternative: two separate deployments
+
+If you prefer (or QuikDB adds per-service root directories), you can instead put
+the **frontend** and **backend** in two separate repos — each repo's root then
+has a detectable stack (`package.json` / `requirements.txt`). In that case set
+`NEXT_PUBLIC_API_BASE_URL` on the frontend to the backend's URL and
+`STARTUPDOCS_CORS_ORIGINS` on the backend to the frontend's URL. The single
+combined container above avoids all of that and is the recommended path.
 
 ---
 
@@ -168,7 +151,9 @@ frontend/
   lib/api.ts           # typed API client (uses NEXT_PUBLIC_API_BASE_URL)
   package.json, tsconfig.json, next.config.mjs, tailwind/postcss config
   Dockerfile
-quikdb.json            # QuikDB auto-detect config (frontend)
+Dockerfile             # root: builds frontend + backend into one image
+start.sh               # root: launches backend (internal) + frontend (public)
+quikdb.json            # QuikDB deploy config
 docker-compose.yml     # local two-service orchestration
 .env.example           # configuration template
 prd.md                 # product requirements

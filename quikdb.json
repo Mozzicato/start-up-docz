@@ -1,11 +1,22 @@
 {
-  "name": "startupdocs-frontend",
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "startCommand": "cd frontend && npx next start -p ${PORT:-3000}",
+  "name": "startupdocs",
+  "startCommand": "./start.sh",
   "envVars": {
-    "NEXT_PUBLIC_API_BASE_URL": {
-      "description": "Public URL of the deployed backend API (the StartupDocs FastAPI service). Must be set at BUILD time because Next.js inlines NEXT_PUBLIC_* vars during the build.",
-      "example": "https://startupdocs-api-xyz.quikdb.io"
+    "GEMINI_API_KEY": {
+      "description": "Optional. Google Gemini API key. If no provider keys are set, the app uses its built-in deterministic generator.",
+      "example": "AIza..."
+    },
+    "OPENROUTER_API_KEY": {
+      "description": "Optional. OpenRouter API key.",
+      "example": "sk-or-..."
+    },
+    "GROQ_API_KEY": {
+      "description": "Optional. Groq API key.",
+      "example": "gsk_..."
+    },
+    "MISTRAL_API_KEY": {
+      "description": "Optional. Mistral API key.",
+      "example": "..."
     }
   }
 }
