@@ -1,10 +1,11 @@
 {
-  "buildCommand": "cd frontend && npm run build",
-  "startCommand": "cd frontend && npm start",
+  "name": "startupdocs-frontend",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "startCommand": "cd frontend && npx next start -p ${PORT:-3000}",
   "envVars": {
     "NEXT_PUBLIC_API_BASE_URL": {
-      "description": "Backend API URL (set this to your backend QuikDB URL)",
-      "example": "https://startupd-api-xyz.quikdb.io"
+      "description": "Public URL of the deployed backend API (the StartupDocs FastAPI service). Must be set at BUILD time because Next.js inlines NEXT_PUBLIC_* vars during the build.",
+      "example": "https://startupdocs-api-xyz.quikdb.io"
     }
   }
 }

@@ -1,172 +1,175 @@
-# StartupDocs MVP – QuikDB Hackathon Submission
+# StartupDocs MVP — QuikDB Hackathon Submission
 
 ## Project Overview
 
-**StartupDocs** is an AI-powered startup planning workspace that automates document generation for Nigerian startups. Founders complete a structured intake form, and the system generates a comprehensive business package (10 PDFs + 4 markdown files) using multi-provider LLM generation with deterministic fallback.
+**StartupDocs** is an AI-powered startup analysis workspace. A founder fills in a
+short intake form (idea, industry, country, audience, business model, budget,
+timeline) and the backend generates a structured startup package: an executive
+summary, readiness scores, market research, competitor analysis, a feasibility
+report, a roadmap, funding opportunities, and a launch checklist. The full
+package can be exported as a single Markdown document.
 
 ## Key Features
 
-### 1. Founder Intake Form
-- Captures core startup data: business model, market, team, financials, regulatory needs
-- Nigeria-localized compliance questions (FIRS, CAC, regulatory frameworks)
-- Clean React UI with Tailwind styling
-- Real-time validation
-
-### 2. AI Generation Engine
-- **Multi-provider support**: OpenRouter, Groq, Gemini, Mistral
-- **Deterministic fallback**: If primary provider fails, system automatically retries with next provider
-- **Document types**: Executive Summary, Pitch Deck Script, Marketing Plan, Financial Model, etc.
-- **Output**: Professional PDFs with ReportLab + markdown templates
-
-### 3. Package Export
-- Downloads all generated documents as a ZIP file
-- Includes PDF generation (Executive Summary, Business Plan, Pitch Deck, etc.)
-- Markdown templates for further customization
-- Single-click download from UI
-
-### 4. Production-Ready Infrastructure
-- **FastAPI backend** with SQLModel ORM + SQLite/PostgreSQL persistence
-- **Next.js 14 frontend** (App Router, standalone mode)
-- **Docker Compose** orchestration with multi-stage builds, non-root users, health checks
-- **Environment-driven configuration**: CORS allowlist, API endpoints, LLM providers
-- GitHub repository: [Mozzicato/start-up-docz](https://github.com/Mozzicato/start-up-docz)
+- **Founder intake form** — clean Next.js + Tailwind UI, typed end-to-end.
+- **Multi-provider LLM generation** — tries OpenRouter → Groq → Gemini → Mistral
+  in a configurable order and uses the first that succeeds.
+- **Deterministic fallback** — if every provider fails or no API keys are set,
+  a built-in mock generator returns a complete, valid package so the app **always
+  works**, even with zero configuration.
+- **Markdown package export** — the whole report is downloadable as a single
+  `.md` file via `/api/v1/projects/{id}/package.md`.
+- **Persistence** — projects are stored via SQLModel (SQLite by default,
+  Postgres-ready through `DATABASE_URL`).
 
 ## Technical Stack
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | Next.js 14, React, Tailwind CSS, TypeScript |
-| **Backend** | FastAPI, SQLModel, ReportLab, Python 3.11 |
-| **Database** | SQLite (persistent Docker volume) or PostgreSQL |
-| **Infrastructure** | Docker Compose, non-root containers, health checks |
-| **AI Integration** | Multi-provider LLM (OpenRouter, Groq, Gemini, Mistral) |
+| **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS |
+| **Backend** | FastAPI, SQLModel, httpx, Pydantic v2, Python 3.12 |
+| **Database** | SQLite (default) or any SQLAlchemy URL via `DATABASE_URL` |
+| **AI** | OpenRouter, Groq, Gemini, Mistral (with deterministic fallback) |
+| **Infra** | Docker + docker-compose, `quikdb.json` for QuikDB auto-detect |
 
-## How It Works
+## API Endpoints (backend)
 
-1. **User fills intake form** → Frontend sends POST to `/api/projects`
-2. **Backend generates documents** → LLM generates content with fallback logic
-3. **PDFs rendered** → ReportLab converts markdown/templates to professional PDFs
-4. **ZIP packaged** → All documents bundled for download
-5. **Data persisted** → Project stored in SQLite for later retrieval
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET  | `/health` | Health check |
+| POST | `/api/v1/startup/report` | Generate a report (no persistence) |
+| POST | `/api/v1/projects` | Generate + save a project |
+| GET  | `/api/v1/projects` | List saved projects |
+| GET  | `/api/v1/projects/{id}` | Fetch one project |
+| GET  | `/api/v1/projects/{id}/package.md` | Export project as Markdown |
 
-## Deployment Status
+The frontend talks to these via `NEXT_PUBLIC_API_BASE_URL`.
 
-✅ Code complete and tested  
-✅ GitHub repository pushed and public  
-✅ Docker setup verified (docker-compose up works)  
-✅ Environment configuration documented  
-✅ Ready for production deployment  
+---
 
-## Local Build & Test (Before Deployment)
+## Local Build & Test
+
+### Backend
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS/Linux
+pip install -r requirements.txt
+uvicorn app.main:app --reload   # http://localhost:8000
+```
 
 ### Frontend
 ```bash
 cd frontend
 npm install
 npm run build
-npm start
+npm start                       # http://localhost:3000
 ```
 
-### Backend
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Frontend runs on `http://localhost:3000`, backend on `http://localhost:8000`.
+Copy `.env.example` to `.env` and fill in any API keys you want to use. **No keys
+are required** — without them the app uses the deterministic fallback generator.
 
 ---
 
-## QuikDB Deployment Instructions
+## QuikDB Deployment
 
-StartupDocs is a **monorepo with two services** (frontend + backend). Deploy as two separate QuikDB apps:
+StartupDocs is a **monorepo with two services** (backend + frontend). You deploy
+**two separate QuikDB deployments from the same repo/branch**
+(`Mozzicato/start-up-docz`, `main`). Deploy the **backend first**, because the
+frontend needs the backend's URL at build time.
 
-### Prerequisites
-- GitHub account linked to QuikDB (done)
-- QuikDB Compute dashboard access
-- API keys: OpenRouter, Groq, Gemini, or Mistral
+`quikdb.json` (repo root) auto-fills the **frontend** commands. The backend
+commands are entered manually in the QuikDB "Configuration" step.
 
-### Deployment Step 1: Backend API
+### Step 1 — Deploy the Backend (API)
 
-1. Go to [QuikDB Compute Dashboard](https://compute.quikdb.com/deployments)
-2. Click **Create Deployment**
-3. Select repository: `Mozzicato/start-up-docz`, branch: `main`
-4. **Configuration:** (auto-detected or manually enter)
+1. **Create Deployment** → select repo `Mozzicato/start-up-docz`, branch `main`.
+2. In **Configuration**, enter:
    - **Build Command:** `cd backend && pip install -r requirements.txt`
-   - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000`
-   - **Environment Variables:** Add these:
-     ```
-     DATABASE_URL=sqlite:///./projects.db
-     OPENROUTER_API_KEY=sk_or_<your_key>
-     GROQ_API_KEY=gsk_<your_key>
-     GEMINI_API_KEY=AIza<your_key>
-     MISTRAL_API_KEY=<your_key>
-     STARTUPDOCS_CORS_ORIGINS=https://<frontend-url>.quikdb.io
-     ```
-5. Click **Deploy**
-6. **Wait for deployment to complete** (2-5 minutes)
-7. **Copy the backend URL** (e.g., `startupd-api-xyz.quikdb.io`)
+   - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+3. **Environment Variables** (all optional — set the ones you have):
+   ```
+   STARTUPDOCS_CORS_ORIGINS=*          # tighten to the frontend URL after Step 2
+   OPENROUTER_API_KEY=<your key>
+   GROQ_API_KEY=<your key>
+   GEMINI_API_KEY=<your key>
+   MISTRAL_API_KEY=<your key>
+   STARTUPDOCS_PROVIDER_ORDER=openrouter,groq,gemini,mistral
+   # DATABASE_URL=postgresql://...     # optional; defaults to SQLite
+   ```
+4. **Deploy**, wait until live, then **copy the backend URL**
+   (e.g. `https://startupdocs-api-xyz.quikdb.io`). Verify `…/health` returns
+   `{"status":"ok"}`.
 
-### Deployment Step 2: Frontend
+### Step 2 — Deploy the Frontend
 
-1. Click **Create Deployment** again
-2. Select repository: `Mozzicato/start-up-docz`, branch: `main`
-3. **Configuration:** (auto-detected from `quikdb.json`)
-   - **Build Command:** `cd frontend && npm run build`
-   - **Start Command:** `cd frontend && npm start`
-   - **Environment Variables:** Add:
-     ```
-     NEXT_PUBLIC_API_BASE_URL=https://<backend-url-from-step-1>
-     ```
-     (Replace `<backend-url-from-step-1>` with the actual URL, e.g., `https://startupd-api-xyz.quikdb.io`)
-4. Click **Deploy**
-5. **Wait for deployment to complete**
-6. Once live, frontend will be at: `https://<your-app>.quikdb.io`
+1. **Create Deployment** → same repo `Mozzicato/start-up-docz`, branch `main`.
+2. **Configuration** is auto-detected from `quikdb.json`:
+   - **Build Command:** `cd frontend && npm install && npm run build`
+   - **Start Command:** `cd frontend && npx next start -p ${PORT:-3000}`
+3. **Environment Variables** — set **before deploying** (Next.js inlines
+   `NEXT_PUBLIC_*` at build time):
+   ```
+   NEXT_PUBLIC_API_BASE_URL=https://<backend-url-from-step-1>
+   ```
+4. **Deploy**, wait until live, then **copy the frontend URL**
+   (e.g. `https://startupdocs-xyz.quikdb.io`).
+
+### Step 3 — Lock down CORS (recommended)
+
+Go back to the **backend** deployment, change
+`STARTUPDOCS_CORS_ORIGINS` from `*` to your frontend URL
+(`https://<frontend-url>`), and redeploy. This restricts the API to your
+frontend instead of allowing any origin.
 
 ### Verification
 
-- Frontend loads at `https://<frontend-app>.quikdb.io`
-- Fill out intake form
-- Submit → should generate documents from backend
-- Download ZIP with all PDFs
-- If document generation fails, backend will **automatically fallback** to next LLM provider
+- Open the frontend URL → fill the intake form → **Generate**.
+- A report renders (LLM output if keys are set, otherwise the fallback package).
+- Export downloads a `.md` file.
 
 ### Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| Frontend shows blank page | Check `NEXT_PUBLIC_API_BASE_URL` env var matches backend URL |
-| API 502 error | Backend may still be deploying (check QuikDB dashboard) |
-| "No AI provider key" error | Verify at least one API key (OpenRouter/Groq/Gemini/Mistral) is set in backend env vars |
-| CORS error | Backend's `STARTUPDOCS_CORS_ORIGINS` must include frontend URL |
-
-## Files Included
-
-- **`prd.md`** – Full product requirements document
-- **`README.md`** – Setup and deployment guide
-- **`docker-compose.yml`** – Complete stack orchestration
-- **`.env.example`** – Configuration template
-- **`quikdb.json`** – QuikDB auto-detection config (frontend)
-- **`frontend/`** – Next.js application (ready to deploy)
-- **`backend/`** – FastAPI application with document generation
-- **`SUBMISSION.md`** – This file
-
-## What's Ready to Deploy
-
-✅ Frontend (Next.js standalone app)  
-✅ Backend (FastAPI with all endpoints)  
-✅ Database persistence (SQLite or Postgres)  
-✅ Document generation pipeline  
-✅ Error handling & fallback logic  
-✅ Docker containerization  
-✅ Environment configuration  
-✅ QuikDB config file (quikdb.json)
+| Symptom | Fix |
+|--------|-----|
+| Frontend can't reach API / CORS error | Backend `STARTUPDOCS_CORS_ORIGINS` must include the frontend URL (or be `*`). |
+| Frontend calls `localhost:8000` | `NEXT_PUBLIC_API_BASE_URL` was not set **before** the frontend build; set it and rebuild. |
+| API 502 right after deploy | Backend still starting — wait and retry. |
+| Reports look generic/templated | No valid API key reached a provider, so the deterministic fallback was used. Add a working key. |
 
 ---
 
-**Repository:** https://github.com/Mozzicato/start-up-docz  
-**Deployed to:** QuikDB Compute  
-**Status:** MVP Complete – Production Ready
+## Repository Contents
+
+```
+backend/
+  app/
+    main.py            # FastAPI app + routes + CORS
+    db.py              # engine/session (DATABASE_URL-aware)
+    models.py          # SQLModel tables
+    schemas.py         # Pydantic request/response models
+    repository.py      # CRUD helpers
+    services/
+      llm_provider.py        # OpenRouter/Groq/Gemini/Mistral clients
+      report_generation.py   # provider order + fallback orchestration
+      mock_agents.py         # deterministic fallback generator
+      package_export.py      # Markdown package builder
+  requirements.txt
+  Dockerfile
+frontend/
+  app/                 # Next.js App Router (page.tsx, layout.tsx, globals.css)
+  lib/api.ts           # typed API client (uses NEXT_PUBLIC_API_BASE_URL)
+  package.json, tsconfig.json, next.config.mjs, tailwind/postcss config
+  Dockerfile
+quikdb.json            # QuikDB auto-detect config (frontend)
+docker-compose.yml     # local two-service orchestration
+.env.example           # configuration template
+prd.md                 # product requirements
+```
+
+---
+
+**Repository:** https://github.com/Mozzicato/start-up-docz
+**Target platform:** QuikDB Compute
+**Status:** MVP complete — source recovered, deploy-ready
