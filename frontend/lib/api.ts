@@ -61,8 +61,20 @@ export type StartupProjectResponse = {
 };
 
 // Prefer same-origin API calls so deployments can use Next.js rewrites.
-// A custom absolute backend URL can still be provided via NEXT_PUBLIC_API_BASE_URL.
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+// Supports either a root backend URL (e.g. http://localhost:8000)
+// or an explicit API URL (e.g. http://localhost:8000/api).
+function normalizeApiBase(raw?: string): string {
+  const fallback = "/api";
+  const value = (raw || "").trim();
+  if (!value) return fallback;
+
+  const withoutTrailingSlash = value.replace(/\/+$/, "");
+  if (withoutTrailingSlash === "/api") return "/api";
+  if (withoutTrailingSlash.endsWith("/api")) return withoutTrailingSlash;
+  return `${withoutTrailingSlash}/api`;
+}
+
+const API_BASE = normalizeApiBase(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   try {
