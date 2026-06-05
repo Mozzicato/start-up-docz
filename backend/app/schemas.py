@@ -43,8 +43,11 @@ class StartupReportResponse(BaseModel):
     unit_economics: str = ""
     cac_model: str = ""
     team_and_execution_strategy: str = ""
+    build_vs_buy: str = ""
     roadmap: list[str]
     mvp_cost_breakdown: list[str] = Field(default_factory=list)
+    tooling_stack: list[str] = Field(default_factory=list)
+    incorporation_playbook: list[str] = Field(default_factory=list)
     legal_requirements: list[str] = Field(default_factory=list)
     growth_experiments: list[str] = Field(default_factory=list)
     risk_register: list[str] = Field(default_factory=list)

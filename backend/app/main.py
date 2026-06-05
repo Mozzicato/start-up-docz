@@ -120,7 +120,12 @@ def export_startup_project_pdf(project_id: int) -> Response:
             raise HTTPException(status_code=404, detail="Project not found")
 
         report = StartupReportResponse.model_validate(project.report_payload)
-        pdf_bytes = build_pdf_package(report)
+        pdf_bytes = build_pdf_package(
+            report,
+            industry=project.industry,
+            country=project.country,
+            founder_mode=getattr(project, "founder_mode", "") or "",
+        )
         safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", report.startup_name).strip("-") or "startup"
         return Response(
             content=pdf_bytes,

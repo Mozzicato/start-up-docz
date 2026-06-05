@@ -7,6 +7,7 @@ from app.schemas import QualityAssessment, StartupIdeaRequest, StartupReportResp
 from app.services.llm_provider import LLMProviderError, call_provider
 from app.services.mock_agents import generate_startup_report
 from app.services.research_context import build_research_context
+from app.services.startup_playbooks import country_playbook
 
 
 def _provider_order() -> list[str]:
@@ -43,7 +44,7 @@ def _normalized_payload(payload: StartupIdeaRequest) -> StartupIdeaRequest:
     return StartupIdeaRequest.model_validate(data)
 
 
-def _build_prompt(payload: StartupIdeaRequest, research_context: dict) -> str:
+def _build_prompt(payload: StartupIdeaRequest, research_context: dict, playbook: dict) -> str:
     mode_guidance = {
         "mvp": "Prioritize speed-to-learning, small-team execution, and early retention proof.",
         "vc": "Prioritize venture-scale narrative, expansion strategy, and durable network effects.",
@@ -70,8 +71,11 @@ def _build_prompt(payload: StartupIdeaRequest, research_context: dict) -> str:
         "unit_economics": "string",
         "cac_model": "string",
         "team_and_execution_strategy": "string",
+        "build_vs_buy": "string",
         "roadmap": ["string", "string", "string", "string", "string", "string"],
         "mvp_cost_breakdown": ["string", "string", "string", "string", "string"],
+        "tooling_stack": ["string", "string", "string", "string", "string"],
+        "incorporation_playbook": ["string", "string", "string", "string", "string"],
         "legal_requirements": ["string", "string", "string", "string", "string"],
         "growth_experiments": ["string", "string", "string", "string", "string"],
         "risk_register": ["string", "string", "string", "string", "string"],
@@ -92,25 +96,38 @@ def _build_prompt(payload: StartupIdeaRequest, research_context: dict) -> str:
         f"Mode guidance: {mode_guidance.get(payload.founder_mode, mode_guidance['mvp'])}\n\n"
         f"Founder input:\n{payload.model_dump_json(indent=2)}\n\n"
         f"Research context (use as evidence):\n{json.dumps(research_context, indent=2)}\n\n"
+        "Verified local playbook (REAL fees, vendor prices, and funding programmes for this country — "
+        "reuse these exact numbers/names and expand on them; do not water them down to generic advice):\n"
+        f"{json.dumps(playbook, indent=2)}\n\n"
         "Output schema:\n"
         f"{json.dumps(schema, indent=2)}\n\n"
-        "Constraints:\n"
-        "- Keep each section practical for MVP founders but specific, not generic.\n"
-        "- market_research must include demand drivers, TAM/SAM/SOM assumptions, and go-to-market implication.\n"
-        "- competitor_analysis must name concrete competitors and explain your wedge.\n"
+        "Constraints — write like a senior analyst who already did days of primary research:\n"
+        "- Be specific and quantified. Every cost must carry a real number or tight range with its "
+        "currency; every tool/vendor/grant must be named; vague phrasing ('affordable', 'some fees') is a "
+        "failure.\n"
+        "- market_research must include demand drivers, TAM/SAM/SOM assumptions WITH numbers, and a "
+        "go-to-market implication.\n"
+        "- competitor_analysis must name 3+ concrete competitors, note their pricing/positioning, and "
+        "explain your wedge.\n"
         "- differentiation must explain defensibility and why incumbents will struggle to copy quickly.\n"
-        "- product_build_plan must explain architecture, feature slices, and implementation approach.\n"
-        "- feasibility_report must include top risks and mitigations.\n"
-        "- unit_economics must include a first-pass revenue equation and key margin drivers.\n"
-        "- cac_model must include a practical formula, channel assumptions, and payback target.\n"
-        "- team_and_execution_strategy must compare founder-led build vs hiring trade-offs.\n"
-        "- roadmap should be milestone-based with measurable outputs.\n"
-        "- mvp_cost_breakdown must include line items and cost ranges.\n"
-        "- legal_requirements must list concrete legal/compliance requirements for the stated country.\n"
-        "- growth_experiments should be testable hypotheses with a success metric.\n"
-        "- risk_register should list concrete risks with owner-level mitigations.\n"
-        "- funding_opportunities should include why each option fits this startup stage.\n"
-        "- launch_checklist should be execution-ready and testable.\n"
+        "- product_build_plan must explain architecture, feature slices, and the implementation approach.\n"
+        "- build_vs_buy must compare (1) vibe-coding it yourself with named AI tools and their monthly "
+        "prices, (2) hiring a developer/freelancer with real local salary or hourly rates, and (3) an "
+        "agency build with a real price range — then give a clear recommendation.\n"
+        "- incorporation_playbook must be an ordered, do-this-then-that list of the EXACT registration "
+        "steps for the stated country, each with the responsible body, the real fee, and a rough timeline "
+        "(for Nigeria: CAC name reservation/registration, TIN, NDPC, SCUML if handling money, etc.).\n"
+        "- tooling_stack must name real services (hosting, database, payments, email, AI, monitoring) with "
+        "their real prices or free tiers.\n"
+        "- mvp_cost_breakdown must be line items with real cost ranges that tie back to the tooling and "
+        "build choices above.\n"
+        "- legal_requirements must list concrete, country-specific legal/compliance obligations.\n"
+        "- funding_opportunities must NAME real programmes/funds/accelerators with their check sizes and "
+        "(where known) application cadence — not abstract categories.\n"
+        "- unit_economics needs a revenue equation and margin drivers; cac_model needs a formula, channel "
+        "assumptions, and a payback target; growth_experiments need a success metric each; risk_register "
+        "needs owner-level mitigations; launch_checklist must be execution-ready and testable; roadmap "
+        "must be milestone-based with measurable outputs.\n"
         "- Use inline citations like [1], [2] in narrative sections when possible.\n"
         "- Populate sources with 3-8 concrete links used as evidence.\n"
         "- Ensure readiness values are realistic and internally consistent.\n"
@@ -148,8 +165,11 @@ def _assess_quality(report: StartupReportResponse) -> QualityAssessment:
         "unit_economics": _score_narrative(report.unit_economics, min_words=45),
         "cac_model": _score_narrative(report.cac_model, min_words=40),
         "team_and_execution_strategy": _score_narrative(report.team_and_execution_strategy, min_words=40),
+        "build_vs_buy": _score_narrative(report.build_vs_buy, min_words=70),
         "roadmap": _score_list(report.roadmap, min_items=6),
         "mvp_cost_breakdown": _score_list(report.mvp_cost_breakdown, min_items=5),
+        "tooling_stack": _score_list(report.tooling_stack, min_items=5),
+        "incorporation_playbook": _score_list(report.incorporation_playbook, min_items=4),
         "legal_requirements": _score_list(report.legal_requirements, min_items=5),
         "growth_experiments": _score_list(report.growth_experiments, min_items=5),
         "risk_register": _score_list(report.risk_register, min_items=5),
@@ -168,7 +188,10 @@ def _assess_quality(report: StartupReportResponse) -> QualityAssessment:
 
 
 def _build_revision_prompt(
-    payload: StartupIdeaRequest, research_context: dict, prior_report: StartupReportResponse
+    payload: StartupIdeaRequest,
+    research_context: dict,
+    playbook: dict,
+    prior_report: StartupReportResponse,
 ) -> str:
     quality = prior_report.quality_assessment
     return (
@@ -176,17 +199,23 @@ def _build_revision_prompt(
         f"Founder mode: {payload.founder_mode}\n"
         f"Founder input:\n{payload.model_dump_json(indent=2)}\n\n"
         f"Research context:\n{json.dumps(research_context, indent=2)}\n\n"
+        "Verified local playbook (reuse these real fees, vendor prices, and named funding programmes):\n"
+        f"{json.dumps(playbook, indent=2)}\n\n"
         f"Current draft JSON:\n{prior_report.model_dump_json(indent=2)}\n\n"
         f"Quality issues to fix:\n{json.dumps(quality.issues, indent=2)}\n\n"
         "Requirements:\n"
-        "- Improve weak sections with concrete competitor names, assumptions, metrics, and citations.\n"
+        "- Replace any generic line with a specific one: real numbers/currency, named vendors, named "
+        "competitors, named funding programmes with check sizes.\n"
+        "- Improve weak sections with concrete assumptions, metrics, and citations.\n"
         "- Preserve strong sections but improve coherence across the document.\n"
-        "- Keep it practical and non-generic.\n"
     )
 
 
 def _ensure_quality(
-    report: StartupReportResponse, payload: StartupIdeaRequest, research_context: dict
+    report: StartupReportResponse,
+    payload: StartupIdeaRequest,
+    research_context: dict,
+    playbook: dict,
 ) -> StartupReportResponse:
     if len(report.roadmap) < 6:
         report.roadmap = [
@@ -198,32 +227,25 @@ def _ensure_quality(
             "Week 11-12: Prepare investor update with retention, GMV, and unit-economics snapshot",
         ]
 
+    # Prefer the verified country playbook (real fees, vendors, named programmes) whenever the
+    # model left these thin or generic.
     if len(report.funding_opportunities) < 5:
-        report.funding_opportunities = [
-            "Campus innovation grants: non-dilutive cash to validate demand on one campus",
-            "University incubator support: mentorship plus pilot-distribution channels",
-            "Angel pre-seed syndicates: suitable once you show early retention and payment volume",
-            "Corporate sponsorships: branded student campaigns can fund acquisition",
-            "Revenue-based financing: useful once transaction take-rate becomes predictable",
-        ]
+        report.funding_opportunities = playbook["funding_opportunities"]
 
     if len(report.mvp_cost_breakdown) < 5:
-        report.mvp_cost_breakdown = [
-            "Engineering build and QA (10-12 weeks): $8,000-$22,000",
-            "Design and UX assets: $1,000-$4,000",
-            "Infra, observability, and storage: $300-$1,500/month",
-            "Payments and identity tooling: $500-$3,000 setup + variable transaction fees",
-            "Pilot operations and incentives: $1,500-$6,000",
-        ]
+        report.mvp_cost_breakdown = playbook["mvp_cost_breakdown"]
+
+    if len(report.tooling_stack) < 5:
+        report.tooling_stack = playbook["tooling_stack"]
+
+    if len(report.incorporation_playbook) < 4:
+        report.incorporation_playbook = playbook["incorporation_playbook"]
 
     if len(report.legal_requirements) < 5:
-        report.legal_requirements = [
-            "Terms of Service and Privacy Policy customized to marketplace operations",
-            "Data privacy controls and consent tracking for user profiles and payments",
-            "Dispute policy, refunds, and service-level commitments",
-            "Payment processor agreements for hold/release and payout responsibilities",
-            "Business registration and tax treatment for transaction fee revenue",
-        ]
+        report.legal_requirements = playbook["legal_requirements"]
+
+    if not report.build_vs_buy.strip():
+        report.build_vs_buy = playbook["build_vs_buy"]
 
     if len(report.growth_experiments) < 5:
         report.growth_experiments = [
@@ -310,7 +332,8 @@ def _ensure_quality(
 def _try_providers(payload: StartupIdeaRequest, providers: Iterable[str]) -> StartupReportResponse:
     normalized_payload = _normalized_payload(payload)
     research_context = build_research_context(normalized_payload)
-    prompt = _build_prompt(normalized_payload, research_context)
+    playbook = country_playbook(normalized_payload)
+    prompt = _build_prompt(normalized_payload, research_context, playbook)
     last_error = "Unknown provider error"
     score_target = int(os.getenv("STARTUPDOCS_QUALITY_SCORE_TARGET", "78"))
     best_report: StartupReportResponse | None = None
@@ -320,16 +343,20 @@ def _try_providers(payload: StartupIdeaRequest, providers: Iterable[str]) -> Sta
             raw = call_provider(provider, prompt)
             parsed = json.loads(_extract_json_block(raw))
             report = StartupReportResponse.model_validate(parsed)
-            report = _ensure_quality(report, normalized_payload, research_context)
+            report = _ensure_quality(report, normalized_payload, research_context, playbook)
 
             if report.quality_assessment.overall >= score_target and not report.quality_assessment.issues:
                 return report
 
-            revision_prompt = _build_revision_prompt(normalized_payload, research_context, report)
+            revision_prompt = _build_revision_prompt(
+                normalized_payload, research_context, playbook, report
+            )
             revised_raw = call_provider(provider, revision_prompt)
             revised_parsed = json.loads(_extract_json_block(revised_raw))
             revised_report = StartupReportResponse.model_validate(revised_parsed)
-            revised_report = _ensure_quality(revised_report, normalized_payload, research_context)
+            revised_report = _ensure_quality(
+                revised_report, normalized_payload, research_context, playbook
+            )
 
             better = revised_report
             if report.quality_assessment.overall > revised_report.quality_assessment.overall:

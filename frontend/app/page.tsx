@@ -390,9 +390,24 @@ export default function HomePage() {
                   title="Team and Execution Strategy"
                   text={report.team_and_execution_strategy}
                 />
-                <ListBlock title="Roadmap" items={report.roadmap} />
+                {report.build_vs_buy ? (
+                  <InfoBlock
+                    title="How To Build It: Vibe-Code vs Hire vs Agency"
+                    text={report.build_vs_buy}
+                  />
+                ) : null}
+                <ListBlock title="12-Week Roadmap" items={report.roadmap} />
                 <ListBlock title="MVP Cost Breakdown" items={report.mvp_cost_breakdown} />
-                <ListBlock title="Legal Requirements" items={report.legal_requirements} />
+                {report.tooling_stack?.length ? (
+                  <ListBlock title="Tooling & Stack (with pricing)" items={report.tooling_stack} />
+                ) : null}
+                {report.incorporation_playbook?.length ? (
+                  <ListBlock
+                    title="Company Registration Playbook"
+                    items={report.incorporation_playbook}
+                  />
+                ) : null}
+                <ListBlock title="Legal & Compliance" items={report.legal_requirements} />
                 <ListBlock title="Growth Experiments" items={report.growth_experiments} />
                 <ListBlock title="Risk Register" items={report.risk_register} />
                 <ListBlock title="Funding Opportunities" items={report.funding_opportunities} />
@@ -547,7 +562,7 @@ function InfoBlock({ title, text }: { title: string; text: string }) {
   return (
     <article className="rounded-xl bg-[#f6ecdc] p-3">
       <h4 className="text-xs uppercase tracking-widest text-muted">{title}</h4>
-      <p className="mt-1">{text}</p>
+      <p className="mt-1 whitespace-pre-line">{text}</p>
     </article>
   );
 }

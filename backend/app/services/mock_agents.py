@@ -1,4 +1,5 @@
 from app.schemas import ReadinessScore, StartupIdeaRequest, StartupReportResponse
+from app.services.startup_playbooks import country_playbook
 
 
 def _clamp_score(value: float) -> float:
@@ -43,29 +44,7 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
         "grant": "Narrative should emphasize inclusion outcomes and measurable social impact.",
     }.get(payload.founder_mode, "Execution should prioritize speed-to-learning and repeat usage.")
 
-    funding_by_mode = {
-        "mvp": [
-            "University innovation grants: non-dilutive capital for pilot execution",
-            "Campus incubator programs: distribution support and advisor access",
-            "Regional startup competitions: early visibility and validation",
-            "Angel checks for pre-seed: suitable once repeat bookings are visible",
-            "Partnership sponsorships with student brands for acquisition campaigns",
-        ],
-        "vc": [
-            "Pre-seed funds focused on African fintech and marketplace velocity",
-            "Angel syndicates with campus or youth demographic expertise",
-            "Accelerators that can unlock distribution and investor readiness",
-            "Strategic fintech partners for payment-rail leverage",
-            "Micro-VCs prioritizing retention and network-effect businesses",
-        ],
-        "grant": [
-            "University innovation grants with youth employment outcomes",
-            "NGO-backed youth livelihood programs with pilot funding",
-            "Government digital-economy grants for student upskilling and jobs",
-            "Corporate CSR programs focused on employability",
-            "Development-finance challenge funds for financial inclusion",
-        ],
-    }
+    playbook = country_playbook(payload)
 
     report = StartupReportResponse(
         startup_name=name,
@@ -120,6 +99,7 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
             "(full-stack engineer, product designer, operations lead). Keep legal/compliance support fractional instead "
             "of full-time in MVP stage."
         ),
+        build_vs_buy=playbook["build_vs_buy"],
         roadmap=[
             "Weeks 1-2: Interview 25 students and map top 3 urgent paid tasks",
             "Weeks 3-4: Build posting, matching, escrow hold, and release flow",
@@ -128,22 +108,10 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
             "Weeks 9-10: Add trust score, dispute workflow, and seller quality controls",
             "Weeks 11-12: Expand to second campus and publish traction metrics",
         ],
-        mvp_cost_breakdown=[
-            "Engineering and product build (10-12 weeks): $8,000-$20,000 depending on founder-led vs hired team",
-            "Design and UX system: $1,000-$3,000",
-            "Cloud, monitoring, storage, and messaging stack: $300-$1,200/month",
-            "Payments, KYC, and fraud tooling setup: $500-$2,500 plus variable transaction fees",
-            "Pilot operations + campus ambassador incentives: $1,500-$6,000",
-            "Legal, policy drafting, and compliance advisory: $1,500-$5,000",
-        ],
-        legal_requirements=[
-            "Terms of Service and Privacy Policy tailored for student-to-student services",
-            "Consumer protection and dispute-resolution policy with clear SLAs",
-            "Data protection compliance (for Nigeria: NDPA alignment and consent handling)",
-            "Payment partner contracts for escrow-like flow and payout responsibilities",
-            "Age and identity verification rules for student onboarding",
-            "Tax and business registration review for marketplace take-rate revenue",
-        ],
+        mvp_cost_breakdown=playbook["mvp_cost_breakdown"],
+        tooling_stack=playbook["tooling_stack"],
+        incorporation_playbook=playbook["incorporation_playbook"],
+        legal_requirements=playbook["legal_requirements"],
         growth_experiments=[
             "Campus ambassador flywheel: recruit 10 ambassadors and measure referral conversion by hostel/faculty",
             "Category sequencing: test tutoring vs errands and keep the category with highest repeat booking",
@@ -158,7 +126,7 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
             "Regulatory exposure in escrow-like flows; mitigation: legal review and licensed partner rails",
             "Trust erosion from unresolved disputes; mitigation: published SLA and escalation policy",
         ],
-        funding_opportunities=funding_by_mode.get(payload.founder_mode, funding_by_mode["mvp"]),
+        funding_opportunities=playbook["funding_opportunities"],
         launch_checklist=[
             "Define one primary job-to-be-done and one ICP for first launch",
             "Implement escrow, payout alerts, and dispute SLA before scale",
