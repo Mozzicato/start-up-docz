@@ -5,8 +5,15 @@ export type StartupIdeaRequest = {
   country: string;
   target_audience: string;
   business_model: string;
+  founder_mode: "mvp" | "vc" | "grant";
   budget_range_usd: number;
   timeline_months: number;
+};
+
+export type QualityAssessment = {
+  overall: number;
+  section_scores: Record<string, number>;
+  issues: string[];
 };
 
 export type StartupReportResponse = {
@@ -23,10 +30,16 @@ export type StartupReportResponse = {
   };
   market_research: string;
   competitor_analysis: string;
+  differentiation: string;
   feasibility_report: string;
+  unit_economics: string;
   roadmap: string[];
+  growth_experiments: string[];
+  risk_register: string[];
   funding_opportunities: string[];
   launch_checklist: string[];
+  sources: string[];
+  quality_assessment: QualityAssessment;
 };
 
 export type StartupProjectSummary = {
@@ -47,66 +60,63 @@ export type StartupProjectResponse = {
   report: StartupReportResponse;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Prefer same-origin API calls so deployments can use Next.js rewrites.
+// A custom absolute backend URL can still be provided via NEXT_PUBLIC_API_BASE_URL.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, init);
+
+    if (!res.ok) {
+      throw new Error(`Request failed (${res.status}).`);
+    }
+
+    return res.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Network error: unable to reach the API. Check frontend API base URL/rewrite and backend availability."
+      );
+    }
+    throw error;
+  }
+}
 
 export function getProjectExportUrl(projectId: number): string {
-  return `${API_BASE}/api/v1/projects/${projectId}/package.md`;
+  return `${API_BASE}/v1/projects/${projectId}/package.md`;
 }
 
 export function getProjectPdfUrl(projectId: number): string {
-  return `${API_BASE}/api/v1/projects/${projectId}/package.pdf`;
+  return `${API_BASE}/v1/projects/${projectId}/package.pdf`;
 }
 
 export async function createStartupReport(
   payload: StartupIdeaRequest
 ): Promise<StartupReportResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/startup/report`, {
+  return requestJson<StartupReportResponse>("/v1/startup/report", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-
-  if (!res.ok) {
-    throw new Error("Failed to generate startup report.");
-  }
-
-  return res.json();
 }
 
 export async function createStartupProject(
   payload: StartupIdeaRequest
 ): Promise<StartupProjectResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/projects`, {
+  return requestJson<StartupProjectResponse>("/v1/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-
-  if (!res.ok) {
-    throw new Error("Failed to create startup project.");
-  }
-
-  return res.json();
 }
 
 export async function listStartupProjects(): Promise<StartupProjectSummary[]> {
-  const res = await fetch(`${API_BASE}/api/v1/projects`, { cache: "no-store" });
-
-  if (!res.ok) {
-    throw new Error("Failed to list projects.");
-  }
-
-  return res.json();
+  return requestJson<StartupProjectSummary[]>("/v1/projects", { cache: "no-store" });
 }
 
 export async function getStartupProject(projectId: number): Promise<StartupProjectResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/projects/${projectId}`, {
+  return requestJson<StartupProjectResponse>(`/v1/projects/${projectId}`, {
     cache: "no-store"
   });
-
-  if (!res.ok) {
-    throw new Error("Failed to load project.");
-  }
-
-  return res.json();
 }

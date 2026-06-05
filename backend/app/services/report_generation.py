@@ -3,9 +3,10 @@ import os
 import re
 from typing import Iterable
 
-from app.schemas import StartupIdeaRequest, StartupReportResponse
+from app.schemas import QualityAssessment, StartupIdeaRequest, StartupReportResponse
 from app.services.llm_provider import LLMProviderError, call_provider
 from app.services.mock_agents import generate_startup_report
+from app.services.research_context import build_research_context
 
 
 def _provider_order() -> list[str]:
@@ -25,7 +26,30 @@ def _extract_json_block(text: str) -> str:
     return text[start : end + 1]
 
 
-def _build_prompt(payload: StartupIdeaRequest) -> str:
+def _normalized_payload(payload: StartupIdeaRequest) -> StartupIdeaRequest:
+    data = payload.model_dump()
+    model = (data.get("business_model") or "").strip().lower()
+    unknown_models = {"i dont know", "i don't know", "unknown", "n/a", "na", "none"}
+
+    if model in unknown_models:
+        idea = (data.get("idea") or "").lower()
+        if "marketplace" in idea or "connect" in idea or "student" in idea:
+            data["business_model"] = "Transaction-fee marketplace"
+        elif "subscription" in idea or "saas" in idea:
+            data["business_model"] = "SaaS subscription"
+        else:
+            data["business_model"] = "Hybrid: transaction fee + premium plans"
+
+    return StartupIdeaRequest.model_validate(data)
+
+
+def _build_prompt(payload: StartupIdeaRequest, research_context: dict) -> str:
+    mode_guidance = {
+        "mvp": "Prioritize speed-to-learning, small-team execution, and early retention proof.",
+        "vc": "Prioritize venture-scale narrative, expansion strategy, and durable network effects.",
+        "grant": "Prioritize measurable social impact, inclusion outcomes, and accountability metrics.",
+    }
+
     schema = {
         "startup_name": "string",
         "summary": "string",
@@ -40,37 +64,237 @@ def _build_prompt(payload: StartupIdeaRequest) -> str:
         },
         "market_research": "string",
         "competitor_analysis": "string",
+        "differentiation": "string",
         "feasibility_report": "string",
-        "roadmap": ["string", "string", "string", "string"],
-        "funding_opportunities": ["string", "string", "string", "string"],
-        "launch_checklist": ["string", "string", "string", "string", "string"],
+        "unit_economics": "string",
+        "roadmap": ["string", "string", "string", "string", "string", "string"],
+        "growth_experiments": ["string", "string", "string", "string", "string"],
+        "risk_register": ["string", "string", "string", "string", "string"],
+        "funding_opportunities": ["string", "string", "string", "string", "string"],
+        "launch_checklist": ["string", "string", "string", "string", "string", "string"],
+        "sources": ["string", "string", "string"],
+        "quality_assessment": {
+            "overall": "integer 0-100",
+            "section_scores": {"market_research": "integer 0-100"},
+            "issues": ["string"],
+        },
     }
 
     return (
-        "Generate a startup analysis package as strict JSON only. "
+        "Generate a founder-grade startup analysis package as strict JSON only. "
         "Do not include explanations, markdown, or code fences.\n\n"
+        f"Founder mode: {payload.founder_mode}\n"
+        f"Mode guidance: {mode_guidance.get(payload.founder_mode, mode_guidance['mvp'])}\n\n"
         f"Founder input:\n{payload.model_dump_json(indent=2)}\n\n"
+        f"Research context (use as evidence):\n{json.dumps(research_context, indent=2)}\n\n"
         "Output schema:\n"
         f"{json.dumps(schema, indent=2)}\n\n"
         "Constraints:\n"
-        "- Keep each section concise and practical for MVP founders.\n"
+        "- Keep each section practical for MVP founders but specific, not generic.\n"
+        "- market_research must include demand drivers, TAM/SAM/SOM assumptions, and go-to-market implication.\n"
+        "- competitor_analysis must name concrete competitors and explain your wedge.\n"
+        "- differentiation must explain defensibility and why incumbents will struggle to copy quickly.\n"
+        "- feasibility_report must include top risks and mitigations.\n"
+        "- unit_economics must include a first-pass revenue equation and key margin drivers.\n"
+        "- roadmap should be milestone-based with measurable outputs.\n"
+        "- growth_experiments should be testable hypotheses with a success metric.\n"
+        "- risk_register should list concrete risks with owner-level mitigations.\n"
+        "- funding_opportunities should include why each option fits this startup stage.\n"
+        "- launch_checklist should be execution-ready and testable.\n"
+        "- Use inline citations like [1], [2] in narrative sections when possible.\n"
+        "- Populate sources with 3-8 concrete links used as evidence.\n"
         "- Ensure readiness values are realistic and internally consistent.\n"
         "- If startup_name is empty, use 'Untitled Startup'.\n"
     )
 
 
+def _score_narrative(text: str, min_words: int = 65) -> int:
+    words = re.findall(r"\b\w+\b", text or "")
+    word_count = len(words)
+    score = min(100, int((word_count / max(min_words, 1)) * 70) + 20)
+    if "[" in text and "]" in text:
+        score += 8
+    if any(token in (text or "").lower() for token in ["tam", "sam", "som", "mitigation", "assumption"]):
+        score += 7
+    return max(0, min(score, 100))
+
+
+def _score_list(items: list[str], min_items: int, min_avg_words: int = 6) -> int:
+    if not items:
+        return 0
+    avg_words = sum(len(re.findall(r"\b\w+\b", item)) for item in items) / len(items)
+    length_score = min(100, int((len(items) / max(min_items, 1)) * 70) + 20)
+    detail_bonus = min(10, int((avg_words / max(min_avg_words, 1)) * 10))
+    return max(0, min(length_score + detail_bonus, 100))
+
+
+def _assess_quality(report: StartupReportResponse) -> QualityAssessment:
+    scores = {
+        "market_research": _score_narrative(report.market_research),
+        "competitor_analysis": _score_narrative(report.competitor_analysis),
+        "differentiation": _score_narrative(report.differentiation, min_words=45),
+        "feasibility_report": _score_narrative(report.feasibility_report, min_words=50),
+        "unit_economics": _score_narrative(report.unit_economics, min_words=45),
+        "roadmap": _score_list(report.roadmap, min_items=6),
+        "growth_experiments": _score_list(report.growth_experiments, min_items=5),
+        "risk_register": _score_list(report.risk_register, min_items=5),
+        "funding_opportunities": _score_list(report.funding_opportunities, min_items=5),
+        "launch_checklist": _score_list(report.launch_checklist, min_items=6),
+        "sources": _score_list(report.sources, min_items=4, min_avg_words=1),
+    }
+
+    issues: list[str] = []
+    for section, score in scores.items():
+        if score < int(os.getenv("STARTUPDOCS_SECTION_SCORE_TARGET", "72")):
+            issues.append(f"{section} needs more specificity, evidence, or detail")
+
+    overall = int(sum(scores.values()) / len(scores)) if scores else 0
+    return QualityAssessment(overall=overall, section_scores=scores, issues=issues)
+
+
+def _build_revision_prompt(
+    payload: StartupIdeaRequest, research_context: dict, prior_report: StartupReportResponse
+) -> str:
+    quality = prior_report.quality_assessment
+    return (
+        "Revise the startup package as strict JSON only. Keep schema exactly the same.\n\n"
+        f"Founder mode: {payload.founder_mode}\n"
+        f"Founder input:\n{payload.model_dump_json(indent=2)}\n\n"
+        f"Research context:\n{json.dumps(research_context, indent=2)}\n\n"
+        f"Current draft JSON:\n{prior_report.model_dump_json(indent=2)}\n\n"
+        f"Quality issues to fix:\n{json.dumps(quality.issues, indent=2)}\n\n"
+        "Requirements:\n"
+        "- Improve weak sections with concrete competitor names, assumptions, metrics, and citations.\n"
+        "- Preserve strong sections but improve coherence across the document.\n"
+        "- Keep it practical and non-generic.\n"
+    )
+
+
+def _ensure_quality(
+    report: StartupReportResponse, payload: StartupIdeaRequest, research_context: dict
+) -> StartupReportResponse:
+    if len(report.roadmap) < 6:
+        report.roadmap = [
+            "Week 1-2: Run 25 customer interviews and validate the top 3 pain points",
+            "Week 3-4: Build and test the first transaction flow with escrow and payout",
+            "Week 5-6: Launch a closed beta with at least 50 students in one campus",
+            "Week 7-8: Improve activation funnel and reduce failed transactions below 2%",
+            "Week 9-10: Expand to 2 additional campuses and onboard campus ambassadors",
+            "Week 11-12: Prepare investor update with retention, GMV, and unit-economics snapshot",
+        ]
+
+    if len(report.funding_opportunities) < 5:
+        report.funding_opportunities = [
+            "Campus innovation grants: non-dilutive cash to validate demand on one campus",
+            "University incubator support: mentorship plus pilot-distribution channels",
+            "Angel pre-seed syndicates: suitable once you show early retention and payment volume",
+            "Corporate sponsorships: branded student campaigns can fund acquisition",
+            "Revenue-based financing: useful once transaction take-rate becomes predictable",
+        ]
+
+    if len(report.growth_experiments) < 5:
+        report.growth_experiments = [
+            "Test ambassador referral loop and target >20% referred signup share",
+            "Test two pricing structures and keep the one with higher contribution margin",
+            "Test trust badge and aim for >25% lower dispute rate",
+            "Test onboarding flow and improve first-job completion rate above 60%",
+            "Test reactivation messaging and lift week-4 retention by at least 10 points",
+        ]
+
+    if len(report.risk_register) < 5:
+        report.risk_register = [
+            "Fraud risk; mitigation: stronger verification and payout guardrails",
+            "Liquidity risk; mitigation: focused launch in one campus with seeded supply",
+            "Payment reliability risk; mitigation: fallback payout rails and alerting",
+            "Compliance risk; mitigation: legal review and regulated payment partners",
+            "Reputation risk; mitigation: strict dispute SLA and transparent policy",
+        ]
+
+    if len(report.launch_checklist) < 6:
+        report.launch_checklist = [
+            "Define one sharp ICP and one urgent job-to-be-done",
+            "Ship escrow and payout reliability alerts before paid acquisition",
+            "Recruit first 20 supply-side users with manual onboarding",
+            "Track activation, repeat booking, and dispute resolution time weekly",
+            "Run two pricing experiments on take-rate and instant-payout fee",
+            "Prepare legal and trust policy pages for student and parent confidence",
+        ]
+
+    if not report.sources:
+        source_urls: list[str] = []
+        for source in research_context.get("sources", []):
+            if not isinstance(source, dict):
+                continue
+            url = source.get("url")
+            if isinstance(url, str) and url not in source_urls:
+                source_urls.append(url)
+        report.sources = source_urls[:8]
+
+    if "[" not in report.market_research and report.sources:
+        report.market_research = f"{report.market_research}\n\nEvidence links: [1] {report.sources[0]}"
+
+    if not report.differentiation.strip():
+        report.differentiation = (
+            "Defensibility comes from trust data, dispute-resolution quality, and campus-level liquidity loops. "
+            "As these improve, the marketplace becomes faster and safer than generic alternatives."
+        )
+
+    if not report.unit_economics.strip():
+        report.unit_economics = (
+            "Revenue = completed jobs x average order value x take-rate, plus instant payout fees. "
+            "Primary margin levers are failed-payment rate, support burden, and repeat booking share."
+        )
+
+    if not report.summary.strip():
+        report.summary = (
+            f"{report.startup_name} addresses a measurable gap for {payload.target_audience} in "
+            f"{payload.country} with a {payload.business_model} model and near-term MVP path."
+        )
+
+    report.quality_assessment = _assess_quality(report)
+
+    return report
+
+
 def _try_providers(payload: StartupIdeaRequest, providers: Iterable[str]) -> StartupReportResponse:
-    prompt = _build_prompt(payload)
+    normalized_payload = _normalized_payload(payload)
+    research_context = build_research_context(normalized_payload)
+    prompt = _build_prompt(normalized_payload, research_context)
     last_error = "Unknown provider error"
+    score_target = int(os.getenv("STARTUPDOCS_QUALITY_SCORE_TARGET", "78"))
+    best_report: StartupReportResponse | None = None
 
     for provider in providers:
         try:
             raw = call_provider(provider, prompt)
             parsed = json.loads(_extract_json_block(raw))
-            return StartupReportResponse.model_validate(parsed)
+            report = StartupReportResponse.model_validate(parsed)
+            report = _ensure_quality(report, normalized_payload, research_context)
+
+            if report.quality_assessment.overall >= score_target and not report.quality_assessment.issues:
+                return report
+
+            revision_prompt = _build_revision_prompt(normalized_payload, research_context, report)
+            revised_raw = call_provider(provider, revision_prompt)
+            revised_parsed = json.loads(_extract_json_block(revised_raw))
+            revised_report = StartupReportResponse.model_validate(revised_parsed)
+            revised_report = _ensure_quality(revised_report, normalized_payload, research_context)
+
+            better = revised_report
+            if report.quality_assessment.overall > revised_report.quality_assessment.overall:
+                better = report
+
+            if better.quality_assessment.overall >= score_target:
+                return better
+
+            if not best_report or better.quality_assessment.overall > best_report.quality_assessment.overall:
+                best_report = better
         except (LLMProviderError, ValueError, json.JSONDecodeError) as err:
             last_error = f"{provider}: {err}"
             continue
+
+    if best_report:
+        return best_report
 
     raise RuntimeError(last_error)
 

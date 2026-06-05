@@ -7,6 +7,12 @@ class LLMProviderError(Exception):
     pass
 
 
+_SYSTEM_PROMPT = (
+    "You are a principal startup analyst. Produce specific, evidence-aware outputs with "
+    "clear assumptions, realistic execution tradeoffs, and strict JSON only."
+)
+
+
 def _extract_openai_text(payload: dict) -> str:
     choices = payload.get("choices", [])
     if not choices:
@@ -32,7 +38,7 @@ def _call_openai_compatible(
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a startup strategy analyst. Return strict JSON only.",
+                        "content": _SYSTEM_PROMPT,
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -65,7 +71,7 @@ def call_openrouter(prompt: str) -> str:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a startup strategy analyst. Return strict JSON only.",
+                        "content": _SYSTEM_PROMPT,
                     },
                     {"role": "user", "content": prompt},
                 ],

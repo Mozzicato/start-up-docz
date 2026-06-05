@@ -18,6 +18,7 @@ type FormState = {
   country: string;
   target_audience: string;
   business_model: string;
+  founder_mode: "mvp" | "vc" | "grant";
   budget_range_usd: number;
   timeline_months: number;
 };
@@ -29,6 +30,7 @@ const initialState: FormState = {
   country: "",
   target_audience: "",
   business_model: "SaaS",
+  founder_mode: "mvp",
   budget_range_usd: 10000,
   timeline_months: 6
 };
@@ -156,6 +158,19 @@ export default function HomePage() {
               placeholder="University students and early professionals"
             />
 
+            <SelectInput
+              label="Founder Mode"
+              value={form.founder_mode}
+              onChange={(value) =>
+                setForm((s) => ({ ...s, founder_mode: value as FormState["founder_mode"] }))
+              }
+              options={[
+                { value: "mvp", label: "Lean MVP" },
+                { value: "vc", label: "VC Narrative" },
+                { value: "grant", label: "Grant / Impact" }
+              ]}
+            />
+
             <div className="grid gap-4 md:grid-cols-3">
               <Input
                 label="Business Model"
@@ -272,12 +287,33 @@ export default function HomePage() {
                   ))}
                 </div>
 
+                <article className="rounded-xl bg-[#f6ecdc] p-3">
+                  <h4 className="text-xs uppercase tracking-widest text-muted">Quality Score</h4>
+                  <p className="mt-1 font-semibold text-lg">
+                    {report.quality_assessment?.overall ?? 0}/100
+                  </p>
+                  {report.quality_assessment?.issues?.length ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-4">
+                      {report.quality_assessment.issues.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-sm">All sections passed quality thresholds.</p>
+                  )}
+                </article>
+
                 <InfoBlock title="Market Research" text={report.market_research} />
                 <InfoBlock title="Competitor Analysis" text={report.competitor_analysis} />
+                <InfoBlock title="Differentiation" text={report.differentiation} />
                 <InfoBlock title="Feasibility" text={report.feasibility_report} />
+                <InfoBlock title="Unit Economics" text={report.unit_economics} />
                 <ListBlock title="Roadmap" items={report.roadmap} />
+                <ListBlock title="Growth Experiments" items={report.growth_experiments} />
+                <ListBlock title="Risk Register" items={report.risk_register} />
                 <ListBlock title="Funding Opportunities" items={report.funding_opportunities} />
                 <ListBlock title="Launch Checklist" items={report.launch_checklist} />
+                {report.sources?.length ? <ListBlock title="Sources" items={report.sources} /> : null}
               </div>
             )}
           </div>
@@ -354,6 +390,35 @@ function NumberInput({
         value={value}
         onChange={(e) => onChange(Number(e.target.value || 0))}
       />
+    </label>
+  );
+}
+
+function SelectInput({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-medium">
+      {label}
+      <select
+        className="w-full rounded-xl border border-[#c9bda9] bg-[#fffaf2] px-3 py-2 text-sm outline-none ring-accent transition focus:ring"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

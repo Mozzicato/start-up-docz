@@ -105,16 +105,31 @@ def build_pdf_package(report: StartupReportResponse) -> bytes:
     ]))
     story.append(table)
 
+    story.append(Paragraph("Quality Assessment", styles["h2"]))
+    story.extend(_paragraphs(f"Overall quality score: {report.quality_assessment.overall}/100", styles["body"]))
+    if report.quality_assessment.issues:
+        story.append(ListFlowable(
+            [
+                ListItem(Paragraph(escape(item), styles["bullet"]))
+                for item in report.quality_assessment.issues
+            ],
+            bulletType="bullet", start="•", leftIndent=14,
+        ))
+
     for heading, text in [
         ("Market Research", report.market_research),
         ("Competitor Analysis", report.competitor_analysis),
+        ("Differentiation", report.differentiation),
         ("Feasibility Report", report.feasibility_report),
+        ("Unit Economics", report.unit_economics),
     ]:
         story.append(Paragraph(heading, styles["h2"]))
         story.extend(_paragraphs(text, styles["body"]))
 
     for heading, items in [
         ("Product Roadmap", report.roadmap),
+        ("Growth Experiments", report.growth_experiments),
+        ("Risk Register", report.risk_register),
         ("Funding Opportunities", report.funding_opportunities),
         ("Launch Checklist", report.launch_checklist),
     ]:
@@ -124,14 +139,25 @@ def build_pdf_package(report: StartupReportResponse) -> bytes:
             bulletType="bullet", start="•", leftIndent=14,
         ))
 
+    if report.sources:
+        story.append(Paragraph("Sources", styles["h2"]))
+        story.append(ListFlowable(
+            [ListItem(Paragraph(escape(item), styles["bullet"])) for item in report.sources],
+            bulletType="bullet", start="•", leftIndent=14,
+        ))
+
     doc.build(story)
     return buffer.getvalue()
 
 
 def build_markdown_package(report: StartupReportResponse) -> str:
     roadmap = "\n".join([f"- {item}" for item in report.roadmap])
+    growth_experiments = "\n".join([f"- {item}" for item in report.growth_experiments])
+    risk_register = "\n".join([f"- {item}" for item in report.risk_register])
     funding = "\n".join([f"- {item}" for item in report.funding_opportunities])
     checklist = "\n".join([f"- {item}" for item in report.launch_checklist])
+    sources = "\n".join([f"- {item}" for item in report.sources])
+    quality_issues = "\n".join([f"- {item}" for item in report.quality_assessment.issues])
 
     return f"""# {report.startup_name} Startup Package
 
@@ -149,6 +175,12 @@ def build_markdown_package(report: StartupReportResponse) -> str:
 - Execution Complexity: {report.readiness.execution_complexity}/10
 - Go-To-Market Readiness: {report.readiness.go_to_market_readiness}/10
 
+## Quality Assessment
+
+- Overall: {report.quality_assessment.overall}/100
+
+{quality_issues if quality_issues else "- No quality issues detected"}
+
 ## Market Research
 
 {report.market_research}
@@ -157,13 +189,29 @@ def build_markdown_package(report: StartupReportResponse) -> str:
 
 {report.competitor_analysis}
 
+## Differentiation
+
+{report.differentiation}
+
 ## Feasibility Report
 
 {report.feasibility_report}
 
+## Unit Economics
+
+{report.unit_economics}
+
 ## Product Roadmap
 
 {roadmap}
+
+## Growth Experiments
+
+{growth_experiments}
+
+## Risk Register
+
+{risk_register}
 
 ## Funding Opportunities
 
@@ -172,4 +220,8 @@ def build_markdown_package(report: StartupReportResponse) -> str:
 ## Launch Checklist
 
 {checklist}
+
+## Sources
+
+{sources if sources else "- No external sources captured"}
 """

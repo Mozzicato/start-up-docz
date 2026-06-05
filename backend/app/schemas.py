@@ -1,5 +1,12 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Literal
+
+
+class QualityAssessment(BaseModel):
+    overall: int = 0
+    section_scores: dict[str, int] = Field(default_factory=dict)
+    issues: list[str] = Field(default_factory=list)
 
 
 class StartupIdeaRequest(BaseModel):
@@ -9,6 +16,7 @@ class StartupIdeaRequest(BaseModel):
     country: str = Field(min_length=2, max_length=80)
     target_audience: str = Field(min_length=4, max_length=240)
     business_model: str = Field(min_length=3, max_length=120)
+    founder_mode: Literal["mvp", "vc", "grant"] = "mvp"
     budget_range_usd: int = Field(ge=0)
     timeline_months: int = Field(ge=1, le=60)
 
@@ -29,10 +37,16 @@ class StartupReportResponse(BaseModel):
     readiness: ReadinessScore
     market_research: str
     competitor_analysis: str
+    differentiation: str = ""
     feasibility_report: str
+    unit_economics: str = ""
     roadmap: list[str]
+    growth_experiments: list[str] = Field(default_factory=list)
+    risk_register: list[str] = Field(default_factory=list)
     funding_opportunities: list[str]
     launch_checklist: list[str]
+    sources: list[str] = Field(default_factory=list)
+    quality_assessment: QualityAssessment = Field(default_factory=QualityAssessment)
 
 
 class StartupProjectSummary(BaseModel):
