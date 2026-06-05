@@ -65,9 +65,14 @@ def _build_prompt(payload: StartupIdeaRequest, research_context: dict) -> str:
         "market_research": "string",
         "competitor_analysis": "string",
         "differentiation": "string",
+        "product_build_plan": "string",
         "feasibility_report": "string",
         "unit_economics": "string",
+        "cac_model": "string",
+        "team_and_execution_strategy": "string",
         "roadmap": ["string", "string", "string", "string", "string", "string"],
+        "mvp_cost_breakdown": ["string", "string", "string", "string", "string"],
+        "legal_requirements": ["string", "string", "string", "string", "string"],
         "growth_experiments": ["string", "string", "string", "string", "string"],
         "risk_register": ["string", "string", "string", "string", "string"],
         "funding_opportunities": ["string", "string", "string", "string", "string"],
@@ -94,9 +99,14 @@ def _build_prompt(payload: StartupIdeaRequest, research_context: dict) -> str:
         "- market_research must include demand drivers, TAM/SAM/SOM assumptions, and go-to-market implication.\n"
         "- competitor_analysis must name concrete competitors and explain your wedge.\n"
         "- differentiation must explain defensibility and why incumbents will struggle to copy quickly.\n"
+        "- product_build_plan must explain architecture, feature slices, and implementation approach.\n"
         "- feasibility_report must include top risks and mitigations.\n"
         "- unit_economics must include a first-pass revenue equation and key margin drivers.\n"
+        "- cac_model must include a practical formula, channel assumptions, and payback target.\n"
+        "- team_and_execution_strategy must compare founder-led build vs hiring trade-offs.\n"
         "- roadmap should be milestone-based with measurable outputs.\n"
+        "- mvp_cost_breakdown must include line items and cost ranges.\n"
+        "- legal_requirements must list concrete legal/compliance requirements for the stated country.\n"
         "- growth_experiments should be testable hypotheses with a success metric.\n"
         "- risk_register should list concrete risks with owner-level mitigations.\n"
         "- funding_opportunities should include why each option fits this startup stage.\n"
@@ -133,9 +143,14 @@ def _assess_quality(report: StartupReportResponse) -> QualityAssessment:
         "market_research": _score_narrative(report.market_research),
         "competitor_analysis": _score_narrative(report.competitor_analysis),
         "differentiation": _score_narrative(report.differentiation, min_words=45),
+        "product_build_plan": _score_narrative(report.product_build_plan, min_words=70),
         "feasibility_report": _score_narrative(report.feasibility_report, min_words=50),
         "unit_economics": _score_narrative(report.unit_economics, min_words=45),
+        "cac_model": _score_narrative(report.cac_model, min_words=40),
+        "team_and_execution_strategy": _score_narrative(report.team_and_execution_strategy, min_words=40),
         "roadmap": _score_list(report.roadmap, min_items=6),
+        "mvp_cost_breakdown": _score_list(report.mvp_cost_breakdown, min_items=5),
+        "legal_requirements": _score_list(report.legal_requirements, min_items=5),
         "growth_experiments": _score_list(report.growth_experiments, min_items=5),
         "risk_register": _score_list(report.risk_register, min_items=5),
         "funding_opportunities": _score_list(report.funding_opportunities, min_items=5),
@@ -192,6 +207,24 @@ def _ensure_quality(
             "Revenue-based financing: useful once transaction take-rate becomes predictable",
         ]
 
+    if len(report.mvp_cost_breakdown) < 5:
+        report.mvp_cost_breakdown = [
+            "Engineering build and QA (10-12 weeks): $8,000-$22,000",
+            "Design and UX assets: $1,000-$4,000",
+            "Infra, observability, and storage: $300-$1,500/month",
+            "Payments and identity tooling: $500-$3,000 setup + variable transaction fees",
+            "Pilot operations and incentives: $1,500-$6,000",
+        ]
+
+    if len(report.legal_requirements) < 5:
+        report.legal_requirements = [
+            "Terms of Service and Privacy Policy customized to marketplace operations",
+            "Data privacy controls and consent tracking for user profiles and payments",
+            "Dispute policy, refunds, and service-level commitments",
+            "Payment processor agreements for hold/release and payout responsibilities",
+            "Business registration and tax treatment for transaction fee revenue",
+        ]
+
     if len(report.growth_experiments) < 5:
         report.growth_experiments = [
             "Test ambassador referral loop and target >20% referred signup share",
@@ -243,6 +276,24 @@ def _ensure_quality(
         report.unit_economics = (
             "Revenue = completed jobs x average order value x take-rate, plus instant payout fees. "
             "Primary margin levers are failed-payment rate, support burden, and repeat booking share."
+        )
+
+    if not report.product_build_plan.strip():
+        report.product_build_plan = (
+            "Build MVP in four slices: onboarding + trust, posting/matching, payment hold/release, and disputes. "
+            "Use a thin backend service layer first, keep operations semi-manual, and automate only repeated workflows."
+        )
+
+    if not report.cac_model.strip():
+        report.cac_model = (
+            "CAC = (paid acquisition + ambassador incentives + onboarding ops) / activated users by channel. "
+            "Track CAC by campus and target payback in under 8 weeks."
+        )
+
+    if not report.team_and_execution_strategy.strip():
+        report.team_and_execution_strategy = (
+            "Founder-led build is faster for iteration in first 6 weeks; hiring improves reliability once payment "
+            "volume grows. Use a hybrid path with one technical founder plus fractional specialists."
         )
 
     if not report.summary.strip():

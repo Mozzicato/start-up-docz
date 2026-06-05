@@ -38,9 +38,14 @@ class StartupReportResponse(BaseModel):
     market_research: str
     competitor_analysis: str
     differentiation: str = ""
+    product_build_plan: str = ""
     feasibility_report: str
     unit_economics: str = ""
+    cac_model: str = ""
+    team_and_execution_strategy: str = ""
     roadmap: list[str]
+    mvp_cost_breakdown: list[str] = Field(default_factory=list)
+    legal_requirements: list[str] = Field(default_factory=list)
     growth_experiments: list[str] = Field(default_factory=list)
     risk_register: list[str] = Field(default_factory=list)
     funding_opportunities: list[str]

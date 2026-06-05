@@ -35,9 +35,62 @@ const initialState: FormState = {
   timeline_months: 6
 };
 
+const INDUSTRY_OPTIONS = [
+  "Fintech",
+  "Edtech",
+  "Healthtech",
+  "SaaS",
+  "E-commerce",
+  "Gig services",
+  "Logistics",
+  "AgriTech",
+  "AI tools",
+  "Climate tech",
+  "Creator economy",
+  "HR tech"
+];
+
+const COUNTRY_OPTIONS = [
+  "Nigeria",
+  "Ghana",
+  "Kenya",
+  "South Africa",
+  "Egypt",
+  "Rwanda",
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "India"
+];
+
+const TARGET_AUDIENCE_OPTIONS = [
+  "University students",
+  "Secondary school students",
+  "Young professionals",
+  "SME business owners",
+  "Freelancers",
+  "Content creators",
+  "Parents",
+  "Remote workers",
+  "Job seekers",
+  "Campus communities"
+];
+
+const BUSINESS_MODEL_OPTIONS = [
+  "Transaction-fee marketplace",
+  "SaaS subscription",
+  "Freemium",
+  "Commission-based",
+  "Usage-based pricing",
+  "Ads + premium",
+  "Enterprise licensing",
+  "Hybrid: subscription + transaction fee"
+];
+
 export default function HomePage() {
   const [form, setForm] = useState<FormState>(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<StartupReportResponse | null>(null);
   const [savedProjects, setSavedProjects] = useState<StartupProjectSummary[]>([]);
@@ -60,6 +113,21 @@ export default function HomePage() {
     void refreshProjects();
   }, []);
 
+  useEffect(() => {
+    if (!isSubmitting) return;
+
+    setSubmitProgress(4);
+    const timer = window.setInterval(() => {
+      setSubmitProgress((prev) => {
+        if (prev >= 92) return prev;
+        const increment = 3 + Math.floor(Math.random() * 6);
+        return Math.min(92, prev + increment);
+      });
+    }, 420);
+
+    return () => window.clearInterval(timer);
+  }, [isSubmitting]);
+
   const readinessStats = useMemo(() => {
     if (!report) return [];
     return [
@@ -79,11 +147,13 @@ export default function HomePage() {
       const result = await createStartupProject(form);
       setActiveProjectId(result.id);
       setReport(result.report);
+      setSubmitProgress(100);
       await refreshProjects();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Request failed.");
     } finally {
       setIsSubmitting(false);
+      window.setTimeout(() => setSubmitProgress(0), 700);
     }
   }
 
@@ -142,12 +212,14 @@ export default function HomePage() {
                 value={form.industry}
                 onChange={(value) => setForm((s) => ({ ...s, industry: value }))}
                 placeholder="Fintech"
+                suggestions={INDUSTRY_OPTIONS}
               />
               <Input
                 label="Country"
                 value={form.country}
                 onChange={(value) => setForm((s) => ({ ...s, country: value }))}
                 placeholder="Nigeria"
+                suggestions={COUNTRY_OPTIONS}
               />
             </div>
 
@@ -156,6 +228,7 @@ export default function HomePage() {
               value={form.target_audience}
               onChange={(value) => setForm((s) => ({ ...s, target_audience: value }))}
               placeholder="University students and early professionals"
+              suggestions={TARGET_AUDIENCE_OPTIONS}
             />
 
             <SelectInput
@@ -177,6 +250,7 @@ export default function HomePage() {
                 value={form.business_model}
                 onChange={(value) => setForm((s) => ({ ...s, business_model: value }))}
                 placeholder="SaaS"
+                suggestions={BUSINESS_MODEL_OPTIONS}
               />
               <NumberInput
                 label="Budget (USD)"
@@ -192,6 +266,8 @@ export default function HomePage() {
           </div>
 
           {error ? <p className="mt-4 text-sm font-semibold text-red-700">{error}</p> : null}
+
+          {isSubmitting ? <GenerationProgress progress={submitProgress} /> : null}
 
           <button
             type="submit"
@@ -306,9 +382,17 @@ export default function HomePage() {
                 <InfoBlock title="Market Research" text={report.market_research} />
                 <InfoBlock title="Competitor Analysis" text={report.competitor_analysis} />
                 <InfoBlock title="Differentiation" text={report.differentiation} />
+                <InfoBlock title="Product Build Plan" text={report.product_build_plan} />
                 <InfoBlock title="Feasibility" text={report.feasibility_report} />
                 <InfoBlock title="Unit Economics" text={report.unit_economics} />
+                <InfoBlock title="CAC Model" text={report.cac_model} />
+                <InfoBlock
+                  title="Team and Execution Strategy"
+                  text={report.team_and_execution_strategy}
+                />
                 <ListBlock title="Roadmap" items={report.roadmap} />
+                <ListBlock title="MVP Cost Breakdown" items={report.mvp_cost_breakdown} />
+                <ListBlock title="Legal Requirements" items={report.legal_requirements} />
                 <ListBlock title="Growth Experiments" items={report.growth_experiments} />
                 <ListBlock title="Risk Register" items={report.risk_register} />
                 <ListBlock title="Funding Opportunities" items={report.funding_opportunities} />
@@ -327,13 +411,20 @@ function Input({
   label,
   value,
   onChange,
-  placeholder
+  placeholder,
+  suggestions
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  suggestions?: string[];
 }) {
+  const listId =
+    suggestions && suggestions.length
+      ? `suggest-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+      : undefined;
+
   return (
     <label className="grid gap-2 text-sm font-medium">
       {label}
@@ -342,7 +433,15 @@ function Input({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        list={listId}
       />
+      {listId ? (
+        <datalist id={listId}>
+          {suggestions?.map((option) => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
+      ) : null}
     </label>
   );
 }
@@ -420,6 +519,27 @@ function SelectInput({
         ))}
       </select>
     </label>
+  );
+}
+
+function GenerationProgress({ progress }: { progress: number }) {
+  const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+
+  return (
+    <div className="mt-4 rounded-xl border border-[#d2bca2] bg-[#f8ecdc] p-3">
+      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-muted">
+        <span>Generating package</span>
+        <span>{clamped}%</span>
+      </div>
+      <div className="mt-2 h-3 rounded-full bg-[#ead8bf]">
+        <div
+          className="relative h-3 rounded-full bg-accent transition-all duration-300"
+          style={{ width: `${clamped}%` }}
+        >
+          <span className="absolute -right-1 -top-1 h-5 w-5 animate-spin rounded-full border-2 border-white bg-accentDark" />
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -31,9 +31,14 @@ export type StartupReportResponse = {
   market_research: string;
   competitor_analysis: string;
   differentiation: string;
+  product_build_plan: string;
   feasibility_report: string;
   unit_economics: string;
+  cac_model: string;
+  team_and_execution_strategy: string;
   roadmap: string[];
+  mvp_cost_breakdown: string[];
+  legal_requirements: string[];
   growth_experiments: string[];
   risk_register: string[];
   funding_opportunities: string[];

@@ -93,6 +93,12 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
             "escrow first, instant release after proof-of-work, and a campus reputation graph. This creates a "
             "defensible loop where better trust drives faster matches and lower disputes."
         ),
+        product_build_plan=(
+            "Architecture recommendation: Next.js frontend, FastAPI backend, Postgres + Redis queue, and a payment "
+            "orchestration layer with webhook reconciliation. Build MVP in 4 slices: (1) profile + KYC-lite onboarding, "
+            "(2) job posting and matching, (3) escrow hold/release flow, and (4) disputes + trust scoring. Start with "
+            "manual operations for disputes, then automate after clear policy patterns emerge."
+        ),
         feasibility_report=(
             "MVP is feasible in 8-12 weeks with a lean team if the first release is constrained to one campus, "
             "one payment corridor, and one dispute policy. Top risks: fraud, low repeat usage, and payout failures. "
@@ -103,6 +109,17 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
             "Track contribution margin per order = (take-rate + payout fee) - payment processing - support/dispute costs. "
             "Target break-even at campus level once repeat booking exceeds 35% and CAC payback is below 8 weeks."
         ),
+        cac_model=(
+            "CAC model by channel: CAC = (channel spend + ambassador incentives + onboarding ops) / activated users. "
+            "Track separately for campus ambassadors, paid social, and referral loops. Initial CAC target: < $6 per "
+            "activated student with payback in <= 8 weeks via repeat bookings and take-rate revenue."
+        ),
+        team_and_execution_strategy=(
+            "Two viable paths: (1) vibe-code with one strong technical founder + part-time product designer for first "
+            "6 weeks, then hire one backend engineer once payment volume rises; (2) hire a compact core team upfront "
+            "(full-stack engineer, product designer, operations lead). Keep legal/compliance support fractional instead "
+            "of full-time in MVP stage."
+        ),
         roadmap=[
             "Weeks 1-2: Interview 25 students and map top 3 urgent paid tasks",
             "Weeks 3-4: Build posting, matching, escrow hold, and release flow",
@@ -110,6 +127,22 @@ def generate_startup_report(payload: StartupIdeaRequest) -> StartupReportRespons
             "Weeks 7-8: Launch referral program and reduce time-to-match below 30 minutes",
             "Weeks 9-10: Add trust score, dispute workflow, and seller quality controls",
             "Weeks 11-12: Expand to second campus and publish traction metrics",
+        ],
+        mvp_cost_breakdown=[
+            "Engineering and product build (10-12 weeks): $8,000-$20,000 depending on founder-led vs hired team",
+            "Design and UX system: $1,000-$3,000",
+            "Cloud, monitoring, storage, and messaging stack: $300-$1,200/month",
+            "Payments, KYC, and fraud tooling setup: $500-$2,500 plus variable transaction fees",
+            "Pilot operations + campus ambassador incentives: $1,500-$6,000",
+            "Legal, policy drafting, and compliance advisory: $1,500-$5,000",
+        ],
+        legal_requirements=[
+            "Terms of Service and Privacy Policy tailored for student-to-student services",
+            "Consumer protection and dispute-resolution policy with clear SLAs",
+            "Data protection compliance (for Nigeria: NDPA alignment and consent handling)",
+            "Payment partner contracts for escrow-like flow and payout responsibilities",
+            "Age and identity verification rules for student onboarding",
+            "Tax and business registration review for marketplace take-rate revenue",
         ],
         growth_experiments=[
             "Campus ambassador flywheel: recruit 10 ambassadors and measure referral conversion by hostel/faculty",

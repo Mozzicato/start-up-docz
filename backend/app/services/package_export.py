@@ -120,14 +120,19 @@ def build_pdf_package(report: StartupReportResponse) -> bytes:
         ("Market Research", report.market_research),
         ("Competitor Analysis", report.competitor_analysis),
         ("Differentiation", report.differentiation),
+        ("Product Build Plan", report.product_build_plan),
         ("Feasibility Report", report.feasibility_report),
         ("Unit Economics", report.unit_economics),
+        ("CAC Model", report.cac_model),
+        ("Team and Execution Strategy", report.team_and_execution_strategy),
     ]:
         story.append(Paragraph(heading, styles["h2"]))
         story.extend(_paragraphs(text, styles["body"]))
 
     for heading, items in [
         ("Product Roadmap", report.roadmap),
+        ("MVP Cost Breakdown", report.mvp_cost_breakdown),
+        ("Legal Requirements", report.legal_requirements),
         ("Growth Experiments", report.growth_experiments),
         ("Risk Register", report.risk_register),
         ("Funding Opportunities", report.funding_opportunities),
@@ -152,6 +157,8 @@ def build_pdf_package(report: StartupReportResponse) -> bytes:
 
 def build_markdown_package(report: StartupReportResponse) -> str:
     roadmap = "\n".join([f"- {item}" for item in report.roadmap])
+    mvp_cost_breakdown = "\n".join([f"- {item}" for item in report.mvp_cost_breakdown])
+    legal_requirements = "\n".join([f"- {item}" for item in report.legal_requirements])
     growth_experiments = "\n".join([f"- {item}" for item in report.growth_experiments])
     risk_register = "\n".join([f"- {item}" for item in report.risk_register])
     funding = "\n".join([f"- {item}" for item in report.funding_opportunities])
@@ -193,6 +200,10 @@ def build_markdown_package(report: StartupReportResponse) -> str:
 
 {report.differentiation}
 
+## Product Build Plan
+
+{report.product_build_plan}
+
 ## Feasibility Report
 
 {report.feasibility_report}
@@ -201,9 +212,25 @@ def build_markdown_package(report: StartupReportResponse) -> str:
 
 {report.unit_economics}
 
+## CAC Model
+
+{report.cac_model}
+
+## Team and Execution Strategy
+
+{report.team_and_execution_strategy}
+
 ## Product Roadmap
 
 {roadmap}
+
+## MVP Cost Breakdown
+
+{mvp_cost_breakdown}
+
+## Legal Requirements
+
+{legal_requirements}
 
 ## Growth Experiments
 
