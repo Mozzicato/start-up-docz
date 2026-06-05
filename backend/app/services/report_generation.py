@@ -378,7 +378,15 @@ def _try_providers(payload: StartupIdeaRequest, providers: Iterable[str]) -> Sta
 
 
 def generate_startup_report_with_fallback(payload: StartupIdeaRequest) -> StartupReportResponse:
+    # Never surface a 500 to the founder: any failure in the live LLM path (provider error,
+    # malformed JSON, network/research-context hiccup, etc.) degrades to the deterministic
+    # mock document, which is itself enriched with the verified country playbook.
     try:
         return _try_providers(payload, _provider_order())
-    except RuntimeError:
+    except Exception as err:  # noqa: BLE001 - intentional broad fallback for resilience
+        import logging
+
+        logging.getLogger("startupdocs").warning(
+            "LLM report path failed (%s); using mock fallback.", err
+        )
         return generate_startup_report(payload)
